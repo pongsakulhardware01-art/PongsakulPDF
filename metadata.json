@@ -1,0 +1,6 @@
+{
+  "name": "PDF to Image Converter",
+  "description": "โปรแกรมแปลงไฟล์ PDF เป็นรูปภาพคุณภาพสูง รวดเร็ว และสามารถแปลงพร้อมกันหลายไฟล์ได้อย่างสะดวกสบาย",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
