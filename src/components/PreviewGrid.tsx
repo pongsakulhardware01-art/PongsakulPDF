@@ -100,7 +100,7 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
                 return (
                   <div
                     key={page.pageNumber}
-                    className="group relative bg-gray-50 rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-rose-200"
+                    className="group relative bg-gray-50 rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-rose-200 flex flex-col justify-between"
                   >
                     {/* Image Aspect ratio wrapper */}
                     <div className="relative aspect-[3/4] overflow-hidden bg-white flex items-center justify-center">
@@ -140,12 +140,38 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
                       </div>
                     </div>
 
-                    {/* Footer labels */}
-                    <div className="p-2 border-t border-gray-50 bg-white flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-700">หน้า {page.pageNumber}</span>
-                      <span className="text-[10px] text-gray-400 font-mono">
-                        {page.width}x{page.height}px
-                      </span>
+                    {/* Footer labels and visible persistent buttons */}
+                    <div className="p-2 border-t border-gray-100 bg-white space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-700">หน้า {page.pageNumber}</span>
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {page.width}x{page.height}px
+                        </span>
+                      </div>
+                      
+                      {/* Persistent Quick Action Buttons (No hover required!) */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-gray-50">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyImage(pageId, page.dataUrl)}
+                          className={`py-1.5 px-2 text-[11px] font-sans font-bold rounded-lg border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            isCopied
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-rose-500 hover:bg-rose-600 text-white border-transparent shadow-sm'
+                          }`}
+                        >
+                          {isCopied ? <Check size={11} className="stroke-[2.5]" /> : <Copy size={11} />}
+                          <span>{isCopied ? 'คัดลอกแล้ว' : 'คัดลอกรูป'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDownloadPage(file.name, page, format)}
+                          className="py-1.5 px-2 text-[11px] font-sans font-bold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Download size={11} />
+                          <span>โหลดภาพ</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -168,7 +194,33 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
                 หน้า {lightbox.file.pages[lightbox.pageIndex].pageNumber} จาก {lightbox.file.pages.length}
               </span>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Copy Button in Lightbox */}
+              <button
+                onClick={() => {
+                  const currentPage = lightbox.file.pages[lightbox.pageIndex];
+                  const pageId = `${lightbox.file.id}_${currentPage.pageNumber}`;
+                  handleCopyImage(pageId, currentPage.dataUrl);
+                }}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-sans font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  copiedStates[`${lightbox.file.id}_${lightbox.file.pages[lightbox.pageIndex].pageNumber}`]
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
+                }`}
+              >
+                {copiedStates[`${lightbox.file.id}_${lightbox.file.pages[lightbox.pageIndex].pageNumber}`] ? (
+                  <>
+                    <Check size={14} className="stroke-[2.5]" />
+                    <span>คัดลอกเรียบร้อย!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    <span>คัดลอกรูปภาพ</span>
+                  </>
+                )}
+              </button>
+
               <button
                 onClick={() =>
                   onDownloadPage(
