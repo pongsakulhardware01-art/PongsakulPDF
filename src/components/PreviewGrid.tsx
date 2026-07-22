@@ -20,25 +20,49 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
 
   const handleCopyImage = async (pageId: string, dataUrl: string) => {
     try {
-      // Fetch the blob from the dataUrl
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      
-      // Copy image blob to clipboard
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          [blob.type]: blob
-        })
-      ]);
-      
-      setCopiedStates((prev) => ({ ...prev, [pageId]: true }));
-      setTimeout(() => {
-        setCopiedStates((prev) => ({ ...prev, [pageId]: false }));
-      }, 2000);
-    } catch (err) {
+      // Convert dataUrl (whether PNG or JPEG) to a pure PNG Blob because ClipboardItem strictly requires 'image/png'
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('ไม่สามารถสร้าง Canvas Context ได้'));
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('ไม่สามารถแปลงเป็นรูปภาพ PNG Blob ได้'));
+            }
+          }, 'image/png');
+        };
+        img.onerror = () => reject(new Error('ไม่สามารถโหลดภาพสำหรับคัดลอกได้'));
+        img.src = dataUrl;
+      });
+
+      // Write PNG blob to system clipboard
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': pngBlob,
+          }),
+        ]);
+        setCopiedStates((prev) => ({ ...prev, [pageId]: true }));
+        setTimeout(() => {
+          setCopiedStates((prev) => ({ ...prev, [pageId]: false }));
+        }, 2500);
+      } else {
+        throw new Error('Clipboard API ไม่รองรับในเบราว์เซอร์นี้');
+      }
+    } catch (err: any) {
       console.error('Failed to copy image to clipboard:', err);
-      // Fallback for clipboard failures
-      alert('ไม่สามารถคัดลอกรูปภาพลงคลิปบอร์ดในบราวเซอร์นี้ได้โดยตรง คุณสามารถคลิกขวาและเลือก "คัดลอกรูปภาพ" แทนได้');
+      alert('คัดลอกรูปภาพไม่สำเร็จ: เบราว์เซอร์อาจบล็อกการเข้าถึงคลิปบอร์ดใน iframe คุณสามารถเปิดรูปภาพในโหมดเต็มจอ หรือคลิกขวาที่รูปแล้วเลือก "คัดลอกรูปภาพ" (Copy image) ได้ครับ');
     }
   };
 
@@ -85,8 +109,33 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
                 </div>
               </div>
 
-              <div className="text-xs text-gray-400 font-normal self-end sm:self-auto">
-                คลิกที่รูปภาพเพื่อเปิดโหมดขยายดูคุณภาพสูง
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                {file.pages.length === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyImage(`${file.id}_1`, file.pages[0].dataUrl)}
+                    className={`px-3 py-1.5 text-xs font-sans font-bold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm ${
+                      copiedStates[`${file.id}_1`]
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
+                    }`}
+                  >
+                    {copiedStates[`${file.id}_1`] ? (
+                      <>
+                        <Check size={14} className="stroke-[2.5]" />
+                        <span>คัดลอกเรียบร้อย!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        <span>คัดลอกรูปภาพ</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <span className="text-xs text-gray-400 font-normal hidden sm:inline">
+                  คลิกที่รูปภาพเพื่อเปิดดูคุณภาพสูง
+                </span>
               </div>
             </div>
 
@@ -141,35 +190,46 @@ export default function PreviewGrid({ files, onDownloadPage, format }: PreviewGr
                     </div>
 
                     {/* Footer labels and visible persistent buttons */}
-                    <div className="p-2 border-t border-gray-100 bg-white space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-700">หน้า {page.pageNumber}</span>
+                    <div className="p-2.5 border-t border-gray-100 bg-white space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-gray-800">หน้า {page.pageNumber}</span>
                         <span className="text-[10px] text-gray-400 font-mono">
                           {page.width}x{page.height}px
                         </span>
                       </div>
                       
-                      {/* Persistent Quick Action Buttons (No hover required!) */}
-                      <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-gray-50">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyImage(pageId, page.dataUrl)}
-                          className={`py-1.5 px-2 text-[11px] font-sans font-bold rounded-lg border flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                            isCopied
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-rose-500 hover:bg-rose-600 text-white border-transparent shadow-sm'
-                          }`}
-                        >
-                          {isCopied ? <Check size={11} className="stroke-[2.5]" /> : <Copy size={11} />}
-                          <span>{isCopied ? 'คัดลอกแล้ว' : 'คัดลอกรูป'}</span>
-                        </button>
+                      {/* Persistent Quick Action Buttons: Download on Left, Copy on RIGHT */}
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-100">
                         <button
                           type="button"
                           onClick={() => onDownloadPage(file.name, page, format)}
-                          className="py-1.5 px-2 text-[11px] font-sans font-bold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer"
+                          className="py-1.5 px-2 text-xs font-sans font-medium bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0"
+                          title="ดาวน์โหลดรูปหน้านี้"
                         >
-                          <Download size={11} />
-                          <span>โหลดภาพ</span>
+                          <Download size={13} />
+                          <span className="text-[11px] font-semibold">โหลด</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyImage(pageId, page.dataUrl)}
+                          className={`flex-1 py-1.5 px-2.5 text-xs font-sans font-bold rounded-lg border flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm min-w-0 ${
+                            isCopied
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-rose-500 hover:bg-rose-600 text-white border-rose-500'
+                          }`}
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check size={13} className="stroke-[2.5] shrink-0" />
+                              <span className="truncate">คัดลอกแล้ว!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} className="shrink-0" />
+                              <span className="truncate">คัดลอกรูปภาพ</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
